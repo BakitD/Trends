@@ -1,0 +1,11 @@
+#Compiled sources
+#################
+*.pyc
+*.o
+
+
+#Other
+#################
+available_locations*
+
+
