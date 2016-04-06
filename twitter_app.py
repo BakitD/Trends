@@ -20,6 +20,11 @@ class TwitterException(Exception): pass
 # is not as it was supposed.
 class TwitterBadResponse(TwitterException):
 	def __init__(self, *args, **kwargs):
+		self.code = None
+		self.reason = None
+		for key, value in kwargs.iteritems():
+			if key == 'reason': self.reason = value
+			if key == 'code': self.code = value
 		super(TwitterException, self).__init__(*args, **kwargs)
 
 
@@ -56,7 +61,7 @@ class TwitterApp:
 		self.bearer_token = response.json()['access_token']
 
 
-	# Function requests trends/place accordind to twitter api.
+	# Function requests trends/available accordind to twitter api.
 	# If response status code is not 200 function generates
 	# TwitterException otherwise returns result in json format.
 	def get_trends_available(self):
@@ -72,7 +77,9 @@ class TwitterApp:
 		return response.json()
 
 
-	# TODO check this function
+	# Function makes request to twitter trends/place api. If the result
+	# of response is not http code 200 function generates exception.
+	# Otherwise returns response in json format.
 	def get_trends_place(self, woeid):
 		headers = {
 			'User-Agent' : 'My Twitter App v1.0.23',
