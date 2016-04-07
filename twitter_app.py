@@ -95,8 +95,9 @@ class TwitterApp:
 		return response.json()
 
 
-	# TODO save to database
-	# Handle trends/place result.
+	# Save available places to database.
+	# TODO check frequesncy of adding new countries
+	# TODO maybe change [] to get method
 	def handle_trends_place(self, places):
 		countries = []
 		cities = []
@@ -113,25 +114,10 @@ class TwitterApp:
 		self.db.add_city(cities)
 
 
-		'''
-		available_data = {}
-		for element in places:
-			if element['country'] in available_data:
-				available_data[element['country']].append(element['name'])
-			else:
-				available_data[element['country']] = []
 
-		f = open('available_locations.txt', 'w')
-		for country, cities in available_data.iteritems():
-			f.write(country.encode('utf-8'))
-			for city in cities: f.write('\n\t' + city.encode('utf-8'))
-			f.write('\n')
-		'''
-
-
-
-
-	#TODO continue main loop
+	# TODO do main loop
+	# TODO check rate limit error in twitter api
+	# TODO check TwitterException class
 	def run(self):
 		self.obtain_token()		
 		places = self.get_trends_available()

@@ -6,12 +6,10 @@ from twitter_db import TwitterDB
 
 
 def main():
-	db = TwitterDB()
-	db.connect(user=DB.user, password=DB.password, db=DB.db)
+	db = TwitterDB(user=DB.user, password=DB.password, dbname=DB.db)
+	db.connect()
 	app = TwitterApp(TOKENS.consumer_key, TOKENS.consumer_secret, db)
 	app.run()
-
-
 
 
 

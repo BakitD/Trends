@@ -1,4 +1,5 @@
 import MySQLdb as mysql
+import base64
 
 class TwitterDBException(Exception):
 	def __init__(self, error='', *args, **kwargs):
@@ -7,34 +8,21 @@ class TwitterDBException(Exception):
 
 
 class TwitterDB:
-	def __init__(self):
+	def __init__(self, user, password, dbname, host='localhost'):
 		self.db = None
-		self.user = None
-		self.host = None
-		self.password = None
-		self.dbname = None
+		self.user = user
+		self.host = host
+		self.password = base64.b64encode(password)
+		self.dbname = dbname
 
-
-	def connect(self, user, password, db, host='localhost'):
-		try:
-			self.db = mysql.connect( \
-				host=host, user=user, \
-				passwd=password, db=db)
-			self.user = user
-			self.password = password
-			self.dbname = db
-			self.host = host
-		except mysql.Error as error:
-			raise TwitterDBException(error=error)
-
-	def reconnect(self):
+	def connect(self):
 		try:
 			self.db = mysql.connect( \
 				host=self.host, user=self.user, \
-				passwd=self.password, db=self.db)
+				passwd=base64.b64decode(self.password), \
+				db=self.dbname, charset='utf8', init_command='set names utf8')
 		except mysql.Error as error:
-			raise TwitterDBException(':'.join(\
-					['DB reconnect failure', str(error)]))
+			raise TwitterDBException(error=error)
 
 
 	def add_country(self, countries):
@@ -45,7 +33,7 @@ class TwitterDB:
 					cursor.execute(' '.join( \
 					["insert ignore into geomap.geomap_country", \
 					"(name, woeid) values ('%s', '%s');" \
-					% (country.get('name').encode('utf8'), \
+					% (country.get('name'), \
 					country.get('woeid'))]))
 				self.db.commit()
 		except mysql.Error as error:
@@ -60,9 +48,9 @@ class TwitterDB:
 					cursor.execute(' '.join( \
 					["insert ignore into geomap_city", \
 					"(name, woeid, country_id) values ", \
-					"('%s', '%s'," % (city.get('name').encode('utf8'), city.get('woeid')),
+					"('%s', '%s'," % (city.get('name'), city.get('woeid')),
 					"(select id from geomap_country where name = '%s'));" \
-					% (city.get('country').encode('utf8'))]))
+					% (city.get('country'))]))
 				self.db.commit()
 		except mysql.Error as error:
 			raise TwitterDBException(error=error)
@@ -72,16 +60,3 @@ class TwitterDB:
 
 
 
-
-
-'''
-def test():
-	db = TwitterDB()
-	db.connect(user='root', password='passsword', db='geomap')
-
-try:
-	test()
-except TwitterDBException as exc:
-	print '>>>>>>>>>>>>', exc.message
-
-'''
