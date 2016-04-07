@@ -1,6 +1,7 @@
 import requests
 import base64
 
+
 #TODO include logging and use RequestExceptions
 #import logging
 #from requests import RequestException
@@ -29,9 +30,10 @@ class TwitterBadResponse(TwitterException):
 
 
 class TwitterApp:
-	def __init__(self, consumer_key, consumer_secret):
+	def __init__(self, consumer_key, consumer_secret, db):
 		self.bearer_token = None
 		self.bearer_token_key = None
+		self.db = db
 		self.prepare_credentials(consumer_key, consumer_secret)
 
 
@@ -96,6 +98,22 @@ class TwitterApp:
 	# TODO save to database
 	# Handle trends/place result.
 	def handle_trends_place(self, places):
+		countries = []
+		cities = []
+		for element in places:
+			if element['placeType']['name'] == 'Country':
+				countries.append({'name':element['name'], \
+						'woeid' : element['woeid']})
+
+			elif element['placeType']['name'] == 'Town':
+				cities.append({'name': element['name'], \
+						'woeid' : element['woeid'], \
+						'country' : element['country']})
+		self.db.add_country(countries)
+		self.db.add_city(cities)
+
+
+		'''
 		available_data = {}
 		for element in places:
 			if element['country'] in available_data:
@@ -108,6 +126,10 @@ class TwitterApp:
 			f.write(country.encode('utf-8'))
 			for city in cities: f.write('\n\t' + city.encode('utf-8'))
 			f.write('\n')
+		'''
+
+
+
 
 	#TODO continue main loop
 	def run(self):
