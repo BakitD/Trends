@@ -1,10 +1,12 @@
 import requests
 import base64
 
+from twitter_db import TwitterDBException
+from requests import RequestException
 
-#TODO include logging and use RequestExceptions
+#TODO include logging
 #import logging
-#from requests import RequestException
+
 
 BEARER_TOKEN_ENDPOINT = 'https://api.twitter.com/oauth2/token'
 TRENDS_PLACE_ENDPOINT = 'https://api.twitter.com/1.1/trends/place.json?'
@@ -14,18 +16,17 @@ TEST_WOEID = '23424757'
 
 
 # Twitter base exception
-class TwitterException(Exception): pass
+class TwitterException(Exception):
+	def __init__(self, *args, **kwargs):
+		super(Exception, self).__init__(*args, **kwargs)
 
 # Incorrect or bad requests. Raise this exception
 # if only result of request to a twitter api
 # is not as it was supposed.
 class TwitterBadResponse(TwitterException):
-	def __init__(self, *args, **kwargs):
-		self.code = None
-		self.reason = None
-		for key, value in kwargs.iteritems():
-			if key == 'reason': self.reason = value
-			if key == 'code': self.code = value
+	def __init__(self, reason, code, *args, **kwargs):
+		self.code = code
+		self.reason = reason
 		super(TwitterException, self).__init__(*args, **kwargs)
 
 
@@ -59,7 +60,7 @@ class TwitterApp:
 		data = 'grant_type=client_credentials'
 		response = requests.post(BEARER_TOKEN_ENDPOINT, headers=headers, data=data)
 		if response.status_code != requests.codes.ok: 
-			raise TwitterBadResponse(reason=r.reason, code=r.status_code)
+			raise TwitterBadResponse(reason=response.reason, code=response.status_code)
 		self.bearer_token = response.json()['access_token']
 
 
@@ -75,7 +76,7 @@ class TwitterApp:
 		}
 		response = requests.get(url, headers=headers)
 		if response.status_code != requests.codes.ok: 
-			raise TwitterBadResponse(reason=r.reason, code=r.status_code)
+			raise TwitterBadResponse(reason=response.reason, code=response.status_code)
 		return response.json()
 
 
@@ -91,40 +92,54 @@ class TwitterApp:
 		url = ''.join([TRENDS_PLACE_ENDPOINT, 'id=%s' % woeid])
 		response = requests.get(url, headers=headers)
 		if response.status_code != requests.codes.ok: 
-			raise TwitterBadResponse(reason=r.reason, code=r.status_code)
+			raise TwitterBadResponse(reason=response.reason, code=response.status_code)
 		return response.json()
 
 
 	# Save available places to database.
-	# TODO check frequesncy of adding new countries
-	# TODO maybe change [] to get method
+	# This function could raise TwitterDBException or Error
 	def handle_trends_place(self, places):
 		countries = []
 		cities = []
-		for element in places:
-			if element['placeType']['name'] == 'Country':
-				countries.append({'name':element['name'], \
-						'woeid' : element['woeid']})
+		for pl in places:
+			if pl['placeType']['name'] == 'Country':
+				countries.append({'name': pl['name'], \
+						'woeid' : pl['woeid']})
 
-			elif element['placeType']['name'] == 'Town':
-				cities.append({'name': element['name'], \
-						'woeid' : element['woeid'], \
-						'country' : element['country']})
+			elif pl['placeType']['name'] == 'Town':
+				cities.append({'name': pl['name'], \
+						'woeid' : pl['woeid'], \
+						'country' : pl['country']})
 		self.db.add_country(countries)
 		self.db.add_city(cities)
+
 
 
 
 	# TODO do main loop
 	# TODO check rate limit error in twitter api
 	# TODO check TwitterException class
+	# TODO requests.codes.too_many is not fatal
+	# TODO CREATE new function for available api
+	# TEST TEST TEST TEST
 	def run(self):
-		self.obtain_token()		
-		places = self.get_trends_available()
-		self.handle_trends_place(places)
+		try:
+			# TODO add log after each function
+			# TODO if self.db.open ? try to connect else close and raise fatal exception
+			self.obtain_token()# not every time	
+			places = self.get_trends_available()
+			self.handle_trends_place(places)
+		except RequestException as exc:
+			print 'REQUEST EXCEPTION' # TODO log or stop ?
+		except (AttributeError, KeyError, TypeError, ValueError) as error:
+			print 'ERROR OCCURED', error.message# TODO what to do
+		except TwitterBadResponse as exc:
+			print 'BAD RESPONSE' # TODO Do something !
+		except TwitterDBException as exc:
+			print 'DB EXCEPTION'
 
 
-		# MAIN LOOP
+		# MAIN LOOP TODO CONTINUE WITH TRENDS/PLACE
 		#bearer_token = response.json()['access_token']
 
 
