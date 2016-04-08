@@ -1,18 +1,21 @@
 import requests
 import base64
+import schedule
+import logging
+import time
 
 from twitter_db import TwitterDBException
 from requests import RequestException
-
-#TODO include logging
-#import logging
-
 
 BEARER_TOKEN_ENDPOINT = 'https://api.twitter.com/oauth2/token'
 TRENDS_PLACE_ENDPOINT = 'https://api.twitter.com/1.1/trends/place.json?'
 TRENDS_AVAILABLE_ENDPOINT = 'https://api.twitter.com/1.1/trends/available.json'
 
 TEST_WOEID = '23424757'
+
+RE_BEARER_TOKEN = 25
+RE_AVAILABLE = 25
+RE_TRENDS = 25
 
 
 # Twitter base exception
@@ -48,7 +51,7 @@ class TwitterApp:
 
 	# Issuing bearer token. Function checks http response code.
 	# If code doesn't equals 200 function generates exception.
-	# In case of successful issuing self.beaerer_token will be assigned.
+	# In case of successful issuing self.bearer_token will be assigned.
 	def obtain_token(self):
 		headers = {
 			'Authorization' : 'Basic %s' % self.bearer_token_key,
@@ -114,35 +117,59 @@ class TwitterApp:
 		self.db.add_city(cities)
 
 
-
-
-	# TODO do main loop
-	# TODO check rate limit error in twitter api
-	# TODO check TwitterException class
-	# TODO requests.codes.too_many is not fatal
-	# TODO CREATE new function for available api
-	# TEST TEST TEST TEST
-	def run(self):
+	# Function obtains bearer token and if exception was
+	# catched with bearer token hasn't been set thus Exception
+	# generates and the process stops. Otherwise message
+	# will be written to a log file. Run every 25 hours.
+	def run_obtain_token(self):
 		try:
-			# TODO add log after each function
-			# TODO if self.db.open ? try to connect else close and raise fatal exception
-			self.obtain_token()# not every time	
+			self.obtain_token()
+		except (TwitterBadResponse, RequestException) as exc:
+			if not self.bearer_token:
+				raise Exception('RUN_OBTAIN_TOKEN: message=(%s, %s)' \
+					% (exc.reason, exc.code))
+			else:
+				logging.error('RUN_OBTAIN_TOKEN: message=(%s, %s)' \
+					% (exc.reason, exc.code))
+		else:
+			logging.info('RUN_OBTAIN_TOKEN: Task successfully finished.')
+
+
+
+	# Function requests available places.
+	# Run every 25 hours.
+	def run_available(self):
+		try:
 			places = self.get_trends_available()
 			self.handle_trends_place(places)
 		except RequestException as exc:
-			print 'REQUEST EXCEPTION' # TODO log or stop ?
+			logging.error('RUN_AVAILABLE: message=(%s)' % exc.message)
 		except (AttributeError, KeyError, TypeError, ValueError) as error:
-			print 'ERROR OCCURED', error.message# TODO what to do
+			logging.error('RUN_AVAILABLE: message=(%s)' % error.message)
 		except TwitterBadResponse as exc:
-			print 'BAD RESPONSE' # TODO Do something !
+			logging.error('RUN_AVAILABLE: message=(%s, %s)' \
+					%(exc.reason, exc.code))
 		except TwitterDBException as exc:
-			print 'DB EXCEPTION'
+			logging.error('RUN_AVAILABLE: message=(%s)' % exc.message)
+		else:
+			logging.info('RUN_AVAILABLE: Task successfully finished.')
+			
 
+
+
+	# Function set schedule for tasks
+	def run(self):
+		schedule.every(0.25).minutes.do(self.run_obtain_token)
+		schedule.every(0.25).minutes.do(self.run_available)
+		logging.info('Starting tasks ...')
+
+		while True:
+			schedule.run_pending()
+			time.sleep(5)
+			print '*'
 
 		# MAIN LOOP TODO CONTINUE WITH TRENDS/PLACE
 		#bearer_token = response.json()['access_token']
-
-
 
 
 '''
