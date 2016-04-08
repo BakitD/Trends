@@ -1,6 +1,7 @@
 import MySQLdb as mysql
 import base64
 from contextlib import closing
+from settings import DATETIME_FORMAT
 
 class TwitterDBException(Exception):
 	def __init__(self, error='', *args, **kwargs):
@@ -51,7 +52,7 @@ class TwitterDB:
 				for city in cities:
 					cursor.execute(' '.join( \
 					["insert ignore into geomap_city", \
-					"(name, woeid, country_id) values ", \
+					"(name, woeid, country_id) values", \
 					"('%s', '%s'," % (city.get('name'), city.get('woeid')),
 					"(select id from geomap_country where name = '%s'));" \
 					% (city.get('country'))]))
@@ -61,5 +62,42 @@ class TwitterDB:
 		except mysql.Error as error:
 			raise TwitterDBException(error=error)
 
-				
+
+	def get_places(self):
+		try:
+			if not self.db.open: self.connect()
+			with closing(self.db.cursor()) as cursor:
+				cursor.execute('select name, woeid from geomap_city;')
+				cities = cursor.fetchall()
+				cursor.execute('select name, woeid from geomap_country;')
+				countries = cursor.fetchall()
+				self.db.commit
+			self.db.close()
+		except mysql.Error as error:
+			raise TwitterDBException(error=error)
+		return countries, cities
+
+
+
+	def add_trends(self, trends):
+		try:
+			if not self.db.open: self.connect()
+			with closing(self.db.cursor()) as cursor:
+				for trend in trends:
+					cursor.execute(' '.join([ \
+					"insert into geomap_trend", \
+					"(name, volume, datetime, woeid) values", \
+					"('%s', '%s', '%s', '%s');" % (trend['name'], trend['volume'], \
+					trend['datetime'], trend['woeid']) \
+					]))
+				cursor.fetchall()
+				self.db.commit()
+			self.db.close()
+		except mysql.Error as error:
+			raise TwitterDBException(error=error)
+
+
+
+
+
 

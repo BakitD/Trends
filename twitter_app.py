@@ -3,6 +3,7 @@ import base64
 import schedule
 import logging
 import time
+import re
 
 from twitter_db import TwitterDBException
 from requests import RequestException
@@ -10,6 +11,7 @@ from requests import RequestException
 BEARER_TOKEN_ENDPOINT = 'https://api.twitter.com/oauth2/token'
 TRENDS_PLACE_ENDPOINT = 'https://api.twitter.com/1.1/trends/place.json?'
 TRENDS_AVAILABLE_ENDPOINT = 'https://api.twitter.com/1.1/trends/available.json'
+TWITTER_RSYMB = '[TZ]'
 
 TEST_WOEID = '23424757'
 
@@ -135,7 +137,6 @@ class TwitterApp:
 			logging.info('RUN_OBTAIN_TOKEN: Task successfully finished.')
 
 
-
 	# Function requests available places.
 	# Run every 25 hours.
 	def run_available(self):
@@ -156,9 +157,37 @@ class TwitterApp:
 			
 
 
+	#TODO Make algorithm
+	def run(self):
+		#TODO which countries choose
+		#countries, cities = self.db.get_places()
+		#print countries, '\n\n', cities
+		self.obtain_token()
+		result = self.get_trends_place(TEST_WOEID)
+		datetime = result[0]['created_at']
+		trends = result[0]['trends']
+		woeid = result[0]['locations'][0]['woeid']
+		#print re.sub(TWITTER_RSYMB, ' ', datetime)
+		#print result[0].keys()
+		#for trend in trends: print trend, '\n'
+		# TODO WRITE PARSE FUNCTION FOR TRENDS 
+
+		'''
+		result = make_test_request(bearer_token=bearer_token)
+		trends_list = result.json()[0]['trends']
+		for element in trends_list:
+			print element['name'] + '\n', #'     volume: ', element['tweet_volume']
+		'''
+
+
+
 
 	# Function set schedule for tasks
-	def run(self):
+	# TODO set frequency of tasks
+	# TODO change algorithm if error is occured
+	def run_l(self):
+
+		# MAIN LOOP TODO CONTINUE WITH TRENDS/PLACE
 		schedule.every(0.25).minutes.do(self.run_obtain_token)
 		schedule.every(0.25).minutes.do(self.run_available)
 		logging.info('Starting tasks ...')
@@ -167,17 +196,5 @@ class TwitterApp:
 			schedule.run_pending()
 			time.sleep(5)
 			print '*'
-
-		# MAIN LOOP TODO CONTINUE WITH TRENDS/PLACE
-		#bearer_token = response.json()['access_token']
-
-
-'''
-result = make_test_request(bearer_token=bearer_token)
-trends_list = result.json()[0]['trends']
-for element in trends_list:
-	print element['name'] + '\n', #'     volume: ', element['tweet_volume']
-'''
-
 
 
