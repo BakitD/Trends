@@ -1,7 +1,9 @@
 import logging
 
-from settings import TOKENS, DB, LOG
+from settings import DB, LOG
 from settings import IS_DEBUG
+from settings import TWITTER_CONFIG_FILE
+
 from twitter_app import TwitterApp
 from twitter_db import TwitterDB
 
@@ -15,7 +17,7 @@ def main():
 					format=LOG.log_format, datefmt=LOG.date_format)
 	db = TwitterDB(user=DB.user, password=DB.password, dbname=DB.db)
 	db.connect()
-	app = TwitterApp(TOKENS.consumer_key, TOKENS.consumer_secret, db)
+	app = TwitterApp(TWITTER_CONFIG_FILE, db)
 	app.run()
 
 
