@@ -66,7 +66,7 @@ class TwitterDB:
 	def get_places(self):
 		try:
 			if not self.db.open: self.connect()
-			with closing(self.db.cursor()) as cursor:
+			with closing(self.db.cursor(mysql.cursors.DictCursor)) as cursor:
 				cursor.execute('select name, woeid from geomap_city;')
 				cities = cursor.fetchall()
 				cursor.execute('select name, woeid from geomap_country;')
@@ -79,7 +79,7 @@ class TwitterDB:
 
 
 
-	def add_trends(self, trends):
+	def add_trends(self, trends, datetime, woeid):
 		try:
 			if not self.db.open: self.connect()
 			with closing(self.db.cursor()) as cursor:
@@ -87,8 +87,8 @@ class TwitterDB:
 					cursor.execute(' '.join([ \
 					"insert into geomap_trend", \
 					"(name, volume, datetime, woeid) values", \
-					"('%s', '%s', '%s', '%s');" % (trend['name'], trend['volume'], \
-					trend['datetime'], trend['woeid']) \
+					"('%s', '%s', '%s', '%s');" % (trend['name'], trend['tweet_volume'], \
+					datetime, woeid) \
 					]))
 				cursor.fetchall()
 				self.db.commit()

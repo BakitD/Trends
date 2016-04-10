@@ -13,7 +13,14 @@ TRENDS_PLACE_ENDPOINT = 'https://api.twitter.com/1.1/trends/place.json?'
 TRENDS_AVAILABLE_ENDPOINT = 'https://api.twitter.com/1.1/trends/available.json'
 TWITTER_RSYMB = '[TZ]'
 
-TEST_WOEID = '23424757'
+TEST_WOEID = '44418'
+
+# Frequencies of requests
+
+# Time between two trends requests.
+# Twitter api set rate limit 15 requests per 15 minutes.
+# Thus this application requests one trend every GET_TREND_SLEEP_TIME seconds.
+TREND_REQUEST_SLEEP_TIME = 61
 
 RE_BEARER_TOKEN = 25
 RE_AVAILABLE = 25
@@ -26,7 +33,7 @@ class TwitterException(Exception):
 		super(Exception, self).__init__(*args, **kwargs)
 
 # Incorrect or bad requests. Raise this exception
-# if only result of request to a twitter api
+# if only the result of request to the twitter api
 # is not as it was supposed.
 class TwitterBadResponse(TwitterException):
 	def __init__(self, reason, code, *args, **kwargs):
@@ -70,7 +77,7 @@ class TwitterApp:
 
 
 	# Function requests trends/available accordind to twitter api.
-	# If response status code is not 200 function generates
+	# If the response status code is not 200 function generates
 	# TwitterException otherwise returns result in json format.
 	def get_trends_available(self):
 		url = TRENDS_AVAILABLE_ENDPOINT
@@ -87,7 +94,7 @@ class TwitterApp:
 
 	# Function makes request to twitter trends/place api. If the result
 	# of response is not http code 200 function generates exception.
-	# Otherwise returns response in json format.
+	# Otherwise function returns response in json format.
 	def get_trends_place(self, woeid):
 		headers = {
 			'User-Agent' : 'My Twitter App v1.0.23',
@@ -102,7 +109,7 @@ class TwitterApp:
 
 
 	# Save available places to database.
-	# This function could raise TwitterDBException or Error
+	# This function may raise TwitterDBException or Error
 	def handle_trends_place(self, places):
 		countries = []
 		cities = []
@@ -119,10 +126,22 @@ class TwitterApp:
 		self.db.add_city(cities)
 
 
-	# Function obtains bearer token and if exception was
-	# catched with bearer token hasn't been set thus Exception
-	# generates and the process stops. Otherwise message
-	# will be written to a log file. Run every 25 hours.
+	# Handle the result of the trends/places requests.
+	# This function may raise TwitterDBException or Error.
+	def handle_trends(self, trends_data):
+		trends_dict = trends_data[0]
+		woeid = trends_dict['locations'][0]['woeid']
+		datetime_nf = trends_dict['created_at']
+		datetime = re.sub(TWITTER_RSYMB, ' ', datetime_nf)
+		trends = trends_dict['trends']
+
+		self.db.add_trends(trends, datetime, woeid)
+
+
+	# Function obtains bearer token and if exception is
+	# catched with bearer token hasn't been set, Exception will be
+	# generated and the process will be stopped. Otherwise message
+	# will be written to a log file. 
 	def run_obtain_token(self):
 		try:
 			self.obtain_token()
@@ -138,7 +157,6 @@ class TwitterApp:
 
 
 	# Function requests available places.
-	# Run every 25 hours.
 	def run_available(self):
 		try:
 			places = self.get_trends_available()
@@ -154,38 +172,43 @@ class TwitterApp:
 			logging.error('RUN_AVAILABLE: message=(%s)' % exc.message)
 		else:
 			logging.info('RUN_AVAILABLE: Task successfully finished.')
-			
 
 
-	#TODO Make algorithm
+	# This function requests every TREND_REQUEST_SLEEP_TIME seconds
+	# trends for specific city and saves it to database.
+	# TODO Make queueing to choose city USE REDIS
+	def run_trends(self):
+		try:
+			countries, cities = self.db.get_places()
+			for city in cities:
+				trends_data = self.get_trends_place(city['woeid'])
+				self.handle_trends(trends_data)
+				logging.info('RUN_TRENDS: Trends for %s city with woeid = %s \
+					woeid has been saved.' % (city['name'], city['woeid']))
+				time.sleep(TREND_REQUEST_SLEEP_TIME)
+		except RequestException as exc:
+			logging.error('RUN_TRENDS: message=(%s)' % exc.message)
+		except (AttributeError, KeyError, TypeError, ValueError) as error:
+			logging.error('RUN_TRENDS: message=(%s)' % error.message)
+		except TwitterBadResponse as exc:
+			logging.error('RUN_TRENDS: message=(%s, %s)' \
+					%(exc.reason, exc.code))
+		except TwitterDBException as exc:
+			logging.erro('RUN_TRENDS: message=(%s)' % exc.message)
+		else:
+			logging.info('RUN_TRENDS: Task successfully finished.')
+
+
 	def run(self):
-		#TODO which countries choose
-		#countries, cities = self.db.get_places()
-		#print countries, '\n\n', cities
 		self.obtain_token()
-		result = self.get_trends_place(TEST_WOEID)
-		datetime = result[0]['created_at']
-		trends = result[0]['trends']
-		woeid = result[0]['locations'][0]['woeid']
-		#print re.sub(TWITTER_RSYMB, ' ', datetime)
-		#print result[0].keys()
-		#for trend in trends: print trend, '\n'
-		# TODO WRITE PARSE FUNCTION FOR TRENDS 
-
-		'''
-		result = make_test_request(bearer_token=bearer_token)
-		trends_list = result.json()[0]['trends']
-		for element in trends_list:
-			print element['name'] + '\n', #'     volume: ', element['tweet_volume']
-		'''
-
-
+		self.run_trends()
 
 
 	# Function set schedule for tasks
 	# TODO set frequency of tasks
 	# TODO change algorithm if error is occured
-	def run_l(self):
+	# TODO start new cycle at specific time not after some
+	def run_temp(self):
 
 		# MAIN LOOP TODO CONTINUE WITH TRENDS/PLACE
 		schedule.every(0.25).minutes.do(self.run_obtain_token)
