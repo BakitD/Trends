@@ -9,29 +9,26 @@ import ConfigParser
 from twitter_db import TwitterDBException
 from requests import RequestException
 
+# Twitter endpoints
 BEARER_TOKEN_ENDPOINT = 'https://api.twitter.com/oauth2/token'
 TRENDS_PLACE_ENDPOINT = 'https://api.twitter.com/1.1/trends/place.json?'
 TRENDS_AVAILABLE_ENDPOINT = 'https://api.twitter.com/1.1/trends/available.json'
 TWITTER_RSYMB = '[TZ]'
 
+# Test value
 TEST_WOEID = '44418'
-
-# Frequencies of requests
 
 # Time between two trends requests.
 # Twitter api set rate limit 15 requests per 15 minutes.
 # Thus this application requests one trend every GET_TREND_SLEEP_TIME seconds.
 TREND_REQUEST_SLEEP_TIME = 61
 
-RE_BEARER_TOKEN = 25
-RE_AVAILABLE = 25
-RE_TRENDS = 25
-
 
 # Twitter base exception
 class TwitterException(Exception):
 	def __init__(self, *args, **kwargs):
 		super(Exception, self).__init__(*args, **kwargs)
+
 
 # Incorrect or bad requests. Raise this exception
 # if only the result of request to the twitter api
@@ -90,6 +87,7 @@ class TwitterApp:
 			raise TwitterBadResponse(reason=response.reason, code=response.status_code)
 		return response.json()['access_token']
 
+
 	# Obtaining tokens from twitter for all credentials.
 	def obtain_tokens(self, credentials):
 		tokens = []
@@ -98,21 +96,22 @@ class TwitterApp:
 				data['consumer_key'], data['consumer_secret']))
 		return tokens
 
+
 	# Function reads configuration file and obtains bearer tokens.
 	def set_tokens(self):
 		try:
 			tokens = self.obtain_tokens(self.read_config())
 		except ConfigParser.Error as error:
-			logging.critical('SET_TOKEN: Critical error during \
-						reading config file!')
+			logging.critical('SET_TOKEN: Critical error during '
+						'reading config file!')
 			raise Exception(error)
 		except (TwitterBadResponse, RequestException) as exc:
 			if not self.tokens:
 				raise Exception('SET_TOKEN: message=(%s, %s)' \
 					% (exc.reason, exc.code))
 			else:
-				logging.error('SET_TOKEN: Tokens have not been obtained. \
-						Old tokens will be used.')
+				logging.error('SET_TOKEN: Tokens have not been obtained. '
+						'Old tokens will be used.')
 		else:
 			self.tokens[:] = []
 			self.tokens = tokens
@@ -142,10 +141,10 @@ class TwitterApp:
 	# Function makes request to twitter trends/place api. If the result
 	# of response is not http code 200 function generates exception.
 	# Otherwise function returns response in json format.
-	def get_trends_place(self, woeid):
+	def get_trends_place(self, bearer_token, woeid):
 		headers = {
 			'User-Agent' : 'My Twitter App v1.0.23',
-			'Authorization' : 'Bearer %s' % self.token_choice(),
+			'Authorization' : 'Bearer %s' % bearer_token,
 			'Accept-Encoding' : 'gzip',
 		}
 		url = ''.join([TRENDS_PLACE_ENDPOINT, 'id=%s' % woeid])
@@ -191,8 +190,7 @@ class TwitterApp:
 
 
 
-	# TODO CONTINUE WITH THIS FUNCTIONS
-	# Handle the result of the trends/places requests.
+	# Handle the result of the trends/places request.
 	# This function may raise TwitterDBException or Error.
 	def handle_trends(self, trends_data):
 		trends_dict = trends_data[0]
@@ -205,15 +203,15 @@ class TwitterApp:
 
 	# This function requests every TREND_REQUEST_SLEEP_TIME seconds
 	# trends for specific city and saves it to database.
-	# TODO Make queueing to choose city USE REDIS
-	def run_trends(self):
+	# TODO Make queueing to choose city USE REDIS and multithreading
+	def run_trends(self, bearer_token):
 		try:
 			countries, cities = self.db.get_places()
 			for city in cities:
-				trends_data = self.get_trends_place(city['woeid'])
+				trends_data = self.get_trends_place(bearer_token, city['woeid'])
 				self.handle_trends(trends_data)
-				logging.info('RUN_TRENDS: Trends for %s city with woeid = %s \
-					woeid has been saved.' % (city['name'], city['woeid']))
+				logging.info('RUN_TRENDS: Trends for %s which woeid is %s ' 
+					'has been saved.' % (city['name'], city['woeid']))
 				time.sleep(TREND_REQUEST_SLEEP_TIME)
 		except RequestException as exc:
 			logging.error('RUN_TRENDS: message=(%s)' % exc.message)
@@ -228,20 +226,16 @@ class TwitterApp:
 			logging.info('RUN_TRENDS: Task successfully finished.')
 
 
+
+
+	# Add multithreading
 	def run(self):
 		self.set_tokens()
 		self.run_available()
-		#self.run_trends()
-
-
-
-
-
-
-
-
-
-
+		# TODO From here add multithreading algorithm
+		# TODO What about multithreading of database
+		# NOT MULTITHREAD JUST ONE-THREADED PROCESS THAT MAKES WORK MORE FREQUENT
+		self.run_trends(self.token_choice())
 
 
 
