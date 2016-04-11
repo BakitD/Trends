@@ -157,19 +157,21 @@ class TwitterApp:
 	# Save available places to database.
 	# This function may raise TwitterDBException or Error
 	def handle_trends_place(self, places):
-		countries = []
-		cities = []
+		places_list = []
 		for pl in places:
-			if pl['placeType']['name'] == 'Country':
-				countries.append({'name': pl['name'], \
-						'woeid' : pl['woeid']})
-
-			elif pl['placeType']['name'] == 'Town':
-				cities.append({'name': pl['name'], \
+			placetype = pl['placeType']['name']
+			if placetype == 'Country' : placetype = 'country'
+			elif placetype == 'Supername': placetype = 'worldwide'
+			elif placetype == 'Town': placetype = 'town'
+			else: 
+				logging.info('HANDLE_TRENDS_PLACES: New placeType is detected: %s!' % placetype)
+				print pl
+				continue
+			places_list.append({'name': pl['name'], \
 						'woeid' : pl['woeid'], \
-						'country' : pl['country']})
-		self.db.add_country(countries)
-		self.db.add_city(cities)
+						'parent_id' : pl['parentid'], \
+						'placetype' : placetype,})
+		self.db.add_places(places_list)
 
 
 	# Function requests available places.
@@ -235,7 +237,7 @@ class TwitterApp:
 		# TODO From here add multithreading algorithm
 		# TODO What about multithreading of database
 		# NOT MULTITHREAD JUST ONE-THREADED PROCESS THAT MAKES WORK MORE FREQUENT
-		self.run_trends(self.token_choice())
+		#self.run_trends(self.token_choice())
 
 
 
