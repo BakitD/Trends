@@ -197,15 +197,11 @@ class TwitterApp:
 	def handle_trends(self, trends_data):
 		trends_dict = trends_data[0]
 		woeid = trends_dict['locations'][0]['woeid']
-		datetime_nf = trends_dict['created_at']
-		datetime = re.sub(TWITTER_RSYMB, ' ', datetime_nf)
 		trends = trends_dict['trends']
-		self.db.add_trends(trends, datetime, woeid)
+		self.db.add_trends(trends, woeid)
 
 
-	# This function requests every TREND_REQUEST_SLEEP_TIME seconds
-	# trends for specific city and saves it to database.
-	# TODO Make queueing to choose city USE REDIS and multithreading
+	# This function saves trends to database.
 	def run_trends(self, bearer_token):
 		try:
 			countries, cities = self.db.get_places()
@@ -214,6 +210,7 @@ class TwitterApp:
 				self.handle_trends(trends_data)
 				logging.info('RUN_TRENDS: Trends for %s which woeid is %s ' 
 					'has been saved.' % (city['name'], city['woeid']))
+				# TODO transfer function outside
 				time.sleep(TREND_REQUEST_SLEEP_TIME)
 		except RequestException as exc:
 			logging.error('RUN_TRENDS: message=(%s)' % exc.message)
@@ -230,17 +227,14 @@ class TwitterApp:
 
 
 
-	# Add multithreading
+	# TODO NOT MULTITHREAD JUST ONE-THREADED PROCESS THAT MAKES WORK MORE FREQUENT
+	# TODO CHECK FUNCITONS
+	# TODO FROM RUN_TRENDS time.sleep() function transfer to thsi function
+	# TODO ADD REDIS 
 	def run(self):
 		self.set_tokens()
 		self.run_available()
-		# TODO From here add multithreading algorithm
-		# TODO What about multithreading of database
-		# NOT MULTITHREAD JUST ONE-THREADED PROCESS THAT MAKES WORK MORE FREQUENT
-		#self.run_trends(self.token_choice())
-
-
-
+		self.run_trends(self.token_choice())
 
 
 

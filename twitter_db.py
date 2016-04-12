@@ -65,18 +65,16 @@ class TwitterDB:
 		return countries, cities
 
 
-	# TODO update functions according to new model in databse and check all functions
-	def add_trends(self, trends, datetime, woeid):
+	def add_trends(self, trends, woeid):
 		try:
 			if not self.db.open: self.connect()
 			with closing(self.db.cursor()) as cursor:
 				for trend in trends:
 					cursor.execute(' '.join([ \
 					"insert into geomap_trend", \
-					"(name, volume, datetime, woeid) values", \
-					"('%s', '%s', '%s', '%s');" % (trend['name'], trend['tweet_volume'], \
-					datetime, woeid) \
-					]))
+					"(name, volume, place_id) values", \
+					"('%s', '%s', (%s));" % (trend['name'], trend['tweet_volume'], \
+					"select id from geomap_place where woeid = '%s'" % woeid)]))
 				cursor.fetchall()
 				self.db.commit()
 			self.db.close()
