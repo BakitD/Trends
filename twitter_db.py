@@ -55,12 +55,12 @@ class TwitterDB:
 						"where placetype_id = (select id from placetype "
 						"where name = 'town') "
 						"and datediff(now(), place.datetime) >= '%s';" % update_time)
-				cities = cursor.fetchall()
+				cities = list(cursor)
 				cursor.execute("select name, woeid, datetime from place "
 						"where placetype_id = (select id from placetype "
 						"where name = 'country') "
 						"and datediff(now(), place.datetime) >= '%s';" % update_time)
-				countries = cursor.fetchall()
+				countries = list(cursor)
 				self.db.commit
 			self.db.close()
 		except mysql.Error as error:

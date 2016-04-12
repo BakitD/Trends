@@ -24,7 +24,8 @@ TREND_REQUEST_SLEEP_TIME = 61
 
 # Update time period in days.
 # This constant is used to define when to update trends
-TREND_UPDATE_TIME = 1
+TREND_UPDATE_TIME = 0
+
 
 
 # Twitter base exception
@@ -206,8 +207,6 @@ class TwitterApp:
 	# This function saves trends to database.
 	def run_trends(self, city, bearer_token):
 		try:
-			#countries, cities = self.db.get_places(TREND_UPDATE_TIME)
-			#for city in cities:
 			trends_data = self.get_trends_place(bearer_token, city['woeid'])
 			self.handle_trends(trends_data)
 			logging.info('RUN_TRENDS: Trends for %s which woeid is %s ' 
@@ -225,20 +224,24 @@ class TwitterApp:
 			logging.info('RUN_TRENDS: Task successfully finished.')
 
 
-	# This function defines trend request algorithm.
-	# Changing this algorithm the one should take into
-	# consideration rate limits and number of available tokens.
+	# This function takes cities for which trends have been updated
+	# TREND_UPDATE_TIME days ago and for every city in cities list
+	# using possible tokens requests trends. Then wait for some time.
+	# TODO save to redis
 	def run_trends_algorithm(self):
 		countries, cities = self.db.get_places(TREND_UPDATE_TIME)
-		for city in cities:
+		flag = True
+		while flag:
 			for token in self.tokens:
-				self.run_trends(city, token)
-			time.sleep(TREND_REQUEST_SLEEP_TIME)
+				if cities: self.run_trends(cities.pop(0), token)
+				else: break
+			if not cities: flag = False
+			else: time.sleep(TREND_REQUEST_SLEEP_TIME)
 
 
 
-	# TODO check functions
-	# Use datetime to get new city in run_trends algrithm
+	# Algorithm that runs every day
+	# TODO check functions and exceptions
 	def run(self):
 		self.set_tokens()
 		self.run_available()
@@ -250,7 +253,7 @@ class TwitterApp:
 	# TODO set frequency of tasks
 	# TODO change algorithm if error is occured
 	# TODO start new cycle at specific time not after some
-	def run_template_for_future(self):
+	def schedule(self):
 
 		# MAIN LOOP TODO CONTINUE WITH TRENDS/PLACE
 		schedule.every(0.25).minutes.do(self.run_available)
