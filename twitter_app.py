@@ -6,8 +6,8 @@ import time
 import re
 import ConfigParser
 
-from twitter_db import TwitterDBException
 from requests import RequestException
+from twitter_db import TwitterDBException
 
 # Twitter endpoints
 BEARER_TOKEN_ENDPOINT = 'https://api.twitter.com/oauth2/token'
@@ -19,9 +19,12 @@ TWITTER_RSYMB = '[TZ]'
 TEST_WOEID = '44418'
 
 # Time between two trends requests.
-# Twitter api set rate limit 15 requests per 15 minutes.
-# Thus this application requests one trend every GET_TREND_SLEEP_TIME seconds.
+# Twitter api has rate limit 15 requests per 15 minutes.
 TREND_REQUEST_SLEEP_TIME = 61
+
+# Update time period in days.
+# This constant is used to define when to update trends
+TREND_UPDATE_TIME = 1
 
 
 # Twitter base exception
@@ -163,9 +166,8 @@ class TwitterApp:
 			if placetype == 'Country' : placetype = 'country'
 			elif placetype == 'Supername': placetype = 'worldwide'
 			elif placetype == 'Town': placetype = 'town'
-			else: 
-				logging.info('HANDLE_TRENDS_PLACES: New placeType is detected: %s!' % placetype)
-				print pl
+			else:
+				#logging.info('HANDLE_TRENDS_PLACES: New placeType is detected: %s!' % placetype)
 				continue
 			places_list.append({'name': pl['name'], \
 						'woeid' : pl['woeid'], \
@@ -202,16 +204,14 @@ class TwitterApp:
 
 
 	# This function saves trends to database.
-	def run_trends(self, bearer_token):
+	def run_trends(self, city, bearer_token):
 		try:
-			countries, cities = self.db.get_places()
-			for city in cities:
-				trends_data = self.get_trends_place(bearer_token, city['woeid'])
-				self.handle_trends(trends_data)
-				logging.info('RUN_TRENDS: Trends for %s which woeid is %s ' 
-					'has been saved.' % (city['name'], city['woeid']))
-				# TODO transfer function outside
-				time.sleep(TREND_REQUEST_SLEEP_TIME)
+			#countries, cities = self.db.get_places(TREND_UPDATE_TIME)
+			#for city in cities:
+			trends_data = self.get_trends_place(bearer_token, city['woeid'])
+			self.handle_trends(trends_data)
+			logging.info('RUN_TRENDS: Trends for %s which woeid is %s ' 
+				'has been saved.' % (city['name'], city['woeid']))
 		except RequestException as exc:
 			logging.error('RUN_TRENDS: message=(%s)' % exc.message)
 		except (AttributeError, KeyError, TypeError, ValueError) as error:
@@ -225,19 +225,24 @@ class TwitterApp:
 			logging.info('RUN_TRENDS: Task successfully finished.')
 
 
+	# This function defines trend request algorithm.
+	# Changing this algorithm the one should take into
+	# consideration rate limits and number of available tokens.
+	def run_trends_algorithm(self):
+		countries, cities = self.db.get_places(TREND_UPDATE_TIME)
+		for city in cities:
+			for token in self.tokens:
+				self.run_trends(city, token)
+			time.sleep(TREND_REQUEST_SLEEP_TIME)
 
 
-	# TODO NOT MULTITHREAD JUST ONE-THREADED PROCESS THAT MAKES WORK MORE FREQUENT
-	# TODO CHECK FUNCITONS
-	# TODO FROM RUN_TRENDS time.sleep() function transfer to thsi function
-	# TODO ADD REDIS 
+
+	# TODO check functions
+	# Use datetime to get new city in run_trends algrithm
 	def run(self):
 		self.set_tokens()
 		self.run_available()
-		self.run_trends(self.token_choice())
-
-
-
+		self.run_trends_algorithm()
 
 
 
