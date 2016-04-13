@@ -54,12 +54,12 @@ class TwitterDB:
 				cursor.execute("select name, woeid, datetime from place "
 						"where placetype_id = (select id from placetype "
 						"where name = 'town') "
-						"and datediff(now(), place.datetime) >= '%s';" % update_time)
+						"and timestampdiff(HOUR, place.datetime, now()) >= '%s';" % update_time)
 				cities = list(cursor)
 				cursor.execute("select name, woeid, datetime from place "
 						"where placetype_id = (select id from placetype "
 						"where name = 'country') "
-						"and datediff(now(), place.datetime) >= '%s';" % update_time)
+						"and timestampdiff(HOUR, place.datetime, now()) >= '%s';" % update_time)
 				countries = list(cursor)
 				self.db.commit
 			self.db.close()

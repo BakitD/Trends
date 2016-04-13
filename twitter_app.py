@@ -8,12 +8,15 @@ import ConfigParser
 
 from requests import RequestException
 from twitter_db import TwitterDBException
+from twitter_mem import TwitterMemException
+from settings import TREND_NUM_PER_PLACE
+
 
 # Twitter endpoints
 BEARER_TOKEN_ENDPOINT = 'https://api.twitter.com/oauth2/token'
 TRENDS_PLACE_ENDPOINT = 'https://api.twitter.com/1.1/trends/place.json?'
 TRENDS_AVAILABLE_ENDPOINT = 'https://api.twitter.com/1.1/trends/available.json'
-TWITTER_RSYMB = '[TZ]'
+
 
 # Test value
 TEST_WOEID = '44418'
@@ -22,9 +25,9 @@ TEST_WOEID = '44418'
 # Twitter api has rate limit 15 requests per 15 minutes.
 TREND_REQUEST_SLEEP_TIME = 61
 
-# Update time period in days.
+# Update time period in hours.
 # This constant is used to define when to update trends
-TREND_UPDATE_TIME = 0
+TREND_UPDATE_TIME = 13
 
 
 
@@ -45,10 +48,12 @@ class TwitterBadResponse(TwitterException):
 
 
 class TwitterApp:
-	def __init__(self, config_filename, db):
+	def __init__(self, config_filename, db, memdb):
 		self.config_filename = config_filename
 		self.tokens = []
 		self.db = db
+		self.memdb = memdb
+
 
 
 	# Reading configuration file that contains twitter credentials.
@@ -195,6 +200,7 @@ class TwitterApp:
 
 
 
+
 	# Handle the result of the trends/places request.
 	# This function may raise TwitterDBException or Error.
 	def handle_trends(self, trends_data):
@@ -202,6 +208,7 @@ class TwitterApp:
 		woeid = trends_dict['locations'][0]['woeid']
 		trends = trends_dict['trends']
 		self.db.add_trends(trends, woeid)
+		self.memdb.save(trends[:TREND_NUM_PER_PLACE], woeid)
 
 
 	# This function saves trends to database.
@@ -219,7 +226,9 @@ class TwitterApp:
 			logging.error('RUN_TRENDS: message=(%s, %s)' \
 					%(exc.reason, exc.code))
 		except TwitterDBException as exc:
-			logging.erro('RUN_TRENDS: message=(%s)' % exc.message)
+			logging.error('RUN_TRENDS: message=(%s)' % exc.message)
+		except TwitterMemException as exc:
+			logging.error('RUN_TRENDS: message=(%s)' % exc.message)
 		else:
 			logging.info('RUN_TRENDS: Task successfully finished.')
 
@@ -227,7 +236,6 @@ class TwitterApp:
 	# This function takes cities for which trends have been updated
 	# TREND_UPDATE_TIME days ago and for every city in cities list
 	# using possible tokens requests trends. Then wait for some time.
-	# TODO save to redis
 	def run_trends_algorithm(self):
 		countries, cities = self.db.get_places(TREND_UPDATE_TIME)
 		flag = True
