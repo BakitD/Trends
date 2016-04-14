@@ -260,7 +260,7 @@ class TwitterApp:
 
 
 
-	# Algorithm that runs every day
+	# Main algorithm
 	def run(self):
 		self.set_tokens()
 		available_status = self.run_available()
@@ -269,20 +269,13 @@ class TwitterApp:
 			raise Exception('Unexpected exception occured!')
 
 
-
-	# Function set schedule for tasks
-	# TODO set frequency of tasks
-	# TODO change algorithm if error is occured
-	# TODO start new cycle at specific time not after some
+	# Schedule and run
+	# TODO Continue here
 	def schedule(self):
-
-		# MAIN LOOP TODO CONTINUE WITH TRENDS/PLACE
 		schedule.every(0.25).minutes.do(self.run_available)
 		logging.info('Starting tasks ...')
-
 		while True:
 			schedule.run_pending()
 			time.sleep(5)
 			print '*'
-
 

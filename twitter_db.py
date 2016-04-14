@@ -81,8 +81,3 @@ class TwitterDB:
 		except mysql.Error as error:
 			raise TwitterDBException(error=error)
 
-
-
-
-
-
