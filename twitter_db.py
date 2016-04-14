@@ -35,13 +35,11 @@ class TwitterDB:
 			if not self.db.open: self.connect()
 			with closing(self.db.cursor()) as cursor:
 				for place in places:
-					cursor.execute(' '.join( \
-					["insert ignore into place", \
-					"(name, woeid, parent_id, placetype_id) values", \
-					"('%s', '%s', '%s', (%s));" % (place.get('name'), \
-					place.get('woeid'), place.get('parent_id'), \
-					"select id from placetype where name = '%s'" \
-					% place.get('placetype'))]))
+					insert = "insert ignore into place " \
+					"(name, woeid, parent_id, placetype_id) values " \
+					"(%s, %s, %s, (select id from placetype where name = %s));"
+					cursor.execute(insert, (place.get('name'), place.get('woeid'), 
+							place.get('parent_id'), place.get('placetype')))
 				self.db.commit()
 			self.db.close()
 		except mysql.Error as error:
@@ -51,15 +49,15 @@ class TwitterDB:
 		try:
 			if not self.db.open: self.connect()
 			with closing(self.db.cursor(mysql.cursors.DictCursor)) as cursor:
-				cursor.execute("select name, woeid, datetime from place "
-						"where placetype_id = (select id from placetype "
-						"where name = 'town') "
-						"and timestampdiff(HOUR, place.datetime, now()) >= '%s';" % update_time)
+				cursor.execute("select name, woeid, dtime from place " \
+						"where placetype_id = (select id from placetype " \
+						"where name = 'town') " \
+						"and timestampdiff(HOUR, place.dtime, now()) >= %s;", (update_time,))
 				cities = list(cursor)
-				cursor.execute("select name, woeid, datetime from place "
-						"where placetype_id = (select id from placetype "
-						"where name = 'country') "
-						"and timestampdiff(HOUR, place.datetime, now()) >= '%s';" % update_time)
+				cursor.execute("select name, woeid, dtime from place " \
+						"where placetype_id = (select id from placetype " \
+						"where name = 'country') " \
+						"and timestampdiff(HOUR, place.dtime, now()) >= %s;", (update_time,))
 				countries = list(cursor)
 				self.db.commit
 			self.db.close()
@@ -73,13 +71,11 @@ class TwitterDB:
 			if not self.db.open: self.connect()
 			with closing(self.db.cursor()) as cursor:
 				for trend in trends:
-					cursor.execute(' '.join([ \
-					"insert into trend", \
-					"(name, volume, place_id) values", \
-					"('%s', '%s', (%s));" % (trend['name'], trend['tweet_volume'], \
-					"select id from place where woeid = '%s'" % woeid)]))
-				cursor.execute("update place set datetime = '%s' where woeid = '%s'" \
-						% (datetime.now().strftime(DATETIME_FORMAT), woeid))
+					insert = "insert into trend (name, volume, place_id) " \
+						 "values (%s, %s, (select id from place where woeid = %s));"
+					cursor.execute(insert, (trend['name'], trend['tweet_volume'], woeid))
+				insert  = "update {} set dtime = %s where woeid = %s;".format('place')
+				cursor.execute(insert, (datetime.now().strftime(DATETIME_FORMAT), woeid))
 				self.db.commit()
 			self.db.close()
 		except mysql.Error as error:

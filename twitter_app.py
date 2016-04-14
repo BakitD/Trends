@@ -27,7 +27,7 @@ TREND_REQUEST_SLEEP_TIME = 61
 
 # Update time period in hours.
 # This constant is used to define when to update trends
-TREND_UPDATE_TIME = 13
+TREND_UPDATE_TIME = 24
 
 
 
@@ -56,7 +56,7 @@ class TwitterApp:
 
 
 
-	# Reading configuration file that contains twitter credentials.
+	# Read configuration file.
 	def read_config(self):
 		config = ConfigParser.ConfigParser()
 		config.read(self.config_filename)
@@ -71,7 +71,7 @@ class TwitterApp:
 		return credentials
 
 
-	# Encodes consumer key and consumer secret keys
+	# Encodes consumer key and consumer secret keys.
 	def encode(self, consumer_key, consumer_secret):
 		concat_key = ':'.join([consumer_key, consumer_secret])
 		concat_key = concat_key.encode('ascii')
@@ -97,7 +97,7 @@ class TwitterApp:
 		return response.json()['access_token']
 
 
-	# Obtaining tokens from twitter for all credentials.
+	# Obtaining tokens for every key in argument credentials.
 	def obtain_tokens(self, credentials):
 		tokens = []
 		for key, data in credentials.iteritems():
@@ -120,7 +120,7 @@ class TwitterApp:
 					% (exc.reason, exc.code))
 			else:
 				logging.error('SET_TOKEN: Tokens have not been obtained. '
-						'Old tokens will be used.')
+						'Old tokens will be used. Message=(%s)' % exc)
 		else:
 			self.tokens[:] = []
 			self.tokens = tokens
@@ -184,6 +184,7 @@ class TwitterApp:
 
 	# Function requests available places.
 	def run_available(self):
+		status = False
 		try:
 			self.handle_trends_place(self.get_trends_available())
 		except RequestException as exc:
@@ -197,7 +198,8 @@ class TwitterApp:
 			logging.error('RUN_AVAILABLE: message=(%s)' % exc.message)
 		else:
 			logging.info('RUN_AVAILABLE: Task successfully finished.')
-
+			status = True
+		return status
 
 
 
@@ -211,13 +213,35 @@ class TwitterApp:
 		self.memdb.save(trends[:TREND_NUM_PER_PLACE], woeid)
 
 
+
 	# This function saves trends to database.
-	def run_trends(self, city, bearer_token):
+	def get_and_save_trends(self, city, bearer_token):
+		self.handle_trends(self.get_trends_place(bearer_token, city['woeid']))
+		logging.info('RUN_TRENDS: Trends for %s which woeid is %s ' 
+			'has been saved.' % (city['name'], city['woeid']))
+
+
+
+	# This function takes one city from cities list for which trends have been updated
+	# update_time days ago and for every city in cities list
+	# using possible tokens requests trends. Then wait for some time.
+	def run_trends_algorithm(self, update_time):
+		countries, cities = self.db.get_places(update_time)
+		flag = True
+		while flag:
+			for token in self.tokens:
+				if cities: 
+					self.get_and_save_trends(cities.pop(0), token)
+				else: break
+			if not cities: flag = False
+			else: time.sleep(TREND_REQUEST_SLEEP_TIME)
+
+
+
+	def run_trends(self, update_time):
+		status = False
 		try:
-			trends_data = self.get_trends_place(bearer_token, city['woeid'])
-			self.handle_trends(trends_data)
-			logging.info('RUN_TRENDS: Trends for %s which woeid is %s ' 
-				'has been saved.' % (city['name'], city['woeid']))
+			self.run_trends_algorithm(update_time)
 		except RequestException as exc:
 			logging.error('RUN_TRENDS: message=(%s)' % exc.message)
 		except (AttributeError, KeyError, TypeError, ValueError) as error:
@@ -231,29 +255,18 @@ class TwitterApp:
 			logging.error('RUN_TRENDS: message=(%s)' % exc.message)
 		else:
 			logging.info('RUN_TRENDS: Task successfully finished.')
-
-
-	# This function takes cities for which trends have been updated
-	# TREND_UPDATE_TIME days ago and for every city in cities list
-	# using possible tokens requests trends. Then wait for some time.
-	def run_trends_algorithm(self):
-		countries, cities = self.db.get_places(TREND_UPDATE_TIME)
-		flag = True
-		while flag:
-			for token in self.tokens:
-				if cities: self.run_trends(cities.pop(0), token)
-				else: break
-			if not cities: flag = False
-			else: time.sleep(TREND_REQUEST_SLEEP_TIME)
+			status = True
+		return status
 
 
 
 	# Algorithm that runs every day
-	# TODO check functions and exceptions
 	def run(self):
 		self.set_tokens()
-		self.run_available()
-		self.run_trends_algorithm()
+		available_status = self.run_available()
+		trends_status = self.run_trends(TREND_UPDATE_TIME)
+		if not available_status and not trends_status:
+			raise Exception('Unexpected exception occured!')
 
 
 
