@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from requests import RequestException
 from twitter_db import TwitterDBException
 from twitter_mem import TwitterMemException
-from settings import TREND_NUM_PER_PLACE, DATETIME_FORMAT
+from settings import TREND_NUM_PER_PLACE, DATETIME_FORMAT, YAHOO_APP_ID
 
 
 # Twitter endpoints
@@ -169,11 +169,23 @@ class TwitterApp:
 			raise TwitterBadResponse(reason=response.reason, code=response.status_code)
 		return response.json()
 
+	# Get longitude and latitude using yahoo api
+	def get_coordinates(self, url):
+		url += '?' + '&'.join(['appid=' + YAHOO_APP_ID, 'format=json'])
+		response = requests.get(url)
+		if response.status_code != requests.codes.ok:
+			raise TwitterBadResponse(reason=response.reason, code=response.status_code)
+		result = response.json()
+		longitude = result['place']['centroid']['longitude']
+		latitude = result['place']['centroid']['latitude']
+		return longitude, latitude
+
 
 	# Save available places to database.
 	# This function may raise TwitterDBException or Error
 	def handle_trends_place(self, places):
 		places_list = []
+		coordinates = {}
 		for pl in places:
 			placetype = pl['placeType']['name']
 			if placetype == 'Country' : placetype = 'country'
@@ -182,12 +194,15 @@ class TwitterApp:
 			else:
 				#logging.info('HANDLE_TRENDS_PLACES: New placeType is detected: %s!' % placetype)
 				continue
-			places_list.append({'name': pl['name'], \
-						'woeid' : pl['woeid'], \
+			longitude, latitude = self.get_coordinates(pl['url'])
+			places_list.append({'name': pl['name'],	'woeid' : pl['woeid'], \
 						'parent_id' : pl['parentid'], \
-						'placetype' : placetype,})
+						'placetype' : placetype, \
+						'longitude' : longitude, \
+						'latitude' : latitude})
+			coordinates[str(pl['woeid'])] = {'longitude':longitude, 'latitude':latitude}
 		self.db.add_places(places_list)
-
+		self.memdb.save_coordinates(coordinates)
 
 	# Function requests available places.
 	def run_available(self):
@@ -217,7 +232,7 @@ class TwitterApp:
 		woeid = trends_dict['locations'][0]['woeid']
 		trends = trends_dict['trends']
 		self.db.add_trends(trends, woeid)
-		self.memdb.save(trends[:TREND_NUM_PER_PLACE], woeid)
+		self.memdb.save_trends(trends[:TREND_NUM_PER_PLACE], woeid)
 
 
 

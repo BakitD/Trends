@@ -36,10 +36,11 @@ class TwitterDB:
 			with closing(self.db.cursor()) as cursor:
 				for place in places:
 					insert = "insert ignore into place " \
-					"(name, woeid, parent_id, placetype_id) values " \
-					"(%s, %s, %s, (select id from placetype where name = %s));"
+					"(name, woeid, parent_id, longitude, latitude, placetype_id) values " \
+					"(%s, %s, %s, %s, %s, (select id from placetype where name = %s));"
 					cursor.execute(insert, (place.get('name'), place.get('woeid'), 
-							place.get('parent_id'), place.get('placetype')))
+							place.get('parent_id'), place.get('longitude'), 
+							place.get('latitude'), place.get('placetype')))
 				self.db.commit()
 			self.db.close()
 		except mysql.Error as error:

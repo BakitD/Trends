@@ -13,6 +13,8 @@ create table if not exists place (
 	id int not null auto_increment primary key,
 	name varchar(32) not null,
 	woeid varchar(16) not null,
+	longitude varchar(32) not null,
+	latitude varchar(32) not null,
 	parent_id varchar(16) default NULL,
 	dtime timestamp not null default 0,
 	placetype_id int not null,
@@ -27,6 +29,7 @@ create trigger before_insert_place
 	before insert on place
 	for each row
 	set new.dtime = date_sub(CURRENT_TIMESTAMP, interval 1 day);
+
 
 create table if not exists trend (
 	id int not null auto_increment primary key,
