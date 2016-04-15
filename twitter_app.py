@@ -1,15 +1,15 @@
 import requests
 import base64
-import schedule
 import logging
 import time
 import re
 import ConfigParser
 
+from datetime import datetime, timedelta
 from requests import RequestException
 from twitter_db import TwitterDBException
 from twitter_mem import TwitterMemException
-from settings import TREND_NUM_PER_PLACE
+from settings import TREND_NUM_PER_PLACE, DATETIME_FORMAT
 
 
 # Twitter endpoints
@@ -29,7 +29,14 @@ TREND_REQUEST_SLEEP_TIME = 61
 # This constant is used to define when to update trends
 TREND_UPDATE_TIME = 24
 
+# Time interval between task launch time in hours
+TASK_INTERVAL = 24
 
+# Sleep time in seconds
+SLEEP_TIME = 3600
+
+# Delay before first start in seconds
+START_DELAY = 5
 
 # Twitter base exception
 class TwitterException(Exception):
@@ -259,9 +266,9 @@ class TwitterApp:
 		return status
 
 
-
-	# Main algorithm
-	def run(self):
+	# Start all tasks
+	def run_tasks(self):
+		logging.info('Starting tasks')
 		self.set_tokens()
 		available_status = self.run_available()
 		trends_status = self.run_trends(TREND_UPDATE_TIME)
@@ -269,13 +276,17 @@ class TwitterApp:
 			raise Exception('Unexpected exception occured!')
 
 
-	# Schedule and run
-	# TODO Continue here
+	# Schedule
 	def schedule(self):
-		schedule.every(0.25).minutes.do(self.run_available)
-		logging.info('Starting tasks ...')
+		start_time = datetime.now()
 		while True:
-			schedule.run_pending()
-			time.sleep(5)
-			print '*'
+			if datetime.now() >= start_time:
+				self.run_tasks()
+				start_time = datetime.now() + timedelta(hours=TASK_INTERVAL)
+				logging.info('Tasks were executed. Next start at %s' \
+						% start_time.strftime(DATETIME_FORMAT))
+			time.sleep(SLEEP_TIME)
 
+
+	def run(self):
+		self.schedule()
