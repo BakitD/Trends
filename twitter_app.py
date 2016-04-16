@@ -192,7 +192,7 @@ class TwitterApp:
 			elif placetype == 'Supername': placetype = 'worldwide'
 			elif placetype == 'Town': placetype = 'town'
 			else:
-				#logging.info('HANDLE_TRENDS_PLACES: New placeType is detected: %s!' % placetype)
+				logging.info('HANDLE_TRENDS_PLACES: New placeType is detected: %s!' % placetype)
 				continue
 			longitude, latitude = self.get_coordinates(pl['url'])
 			places_list.append({'name': pl['name'],	'woeid' : pl['woeid'], \

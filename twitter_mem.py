@@ -15,24 +15,33 @@ class TwitterMem:
 	def __init__(self, prefix, host='localhost', port=6379):
 		self.redis = redis.StrictRedis(host=host, port=port)
 		self.prefix = prefix
-		self.coordinates_prefix = '_'.join([self.prefix, 'coordinates'])
 
 
 	# Saves to memory list of trends with key woeid.
 	def save_trends(self, trends, woeid):
+		trend_list = []
+		for element in trends:
+			trend_list.append(element['name'])
 		data = self.redis.get(self.prefix)
 		if data:
 			data = json.loads(data)
-			data[str(woeid)] = trends
+			data[str(woeid)]['trends'] = trend_list
 		else:
-			data = {str(woeid) : trends}
+			data = {}
+			data[str(woeid)] = {'trends' : trend_list, 'coordinates':{}}
 		self.redis.set(self.prefix, json.dumps(data))
 
 
 	def save_coordinates(self, coordinates):
-		self.redis.set(self.coordinates_prefix, json.dumps(coordinates))
-		
-		
+		data = self.redis.get(self.prefix)
+		if data:
+			data = json.loads(data)
+			for woeid, coord in coordinates.iteritems():
+				data[str(woeid)]['coordinates'] = coord
+		else:
+			data = {}
+			for woeid, coord in coordinates.iteritems():
+				data[str(woeid)] = {'trends' : [], 'coordinates':coord}
+		self.redis.set(self.prefix, json.dumps(data))
 
 
-		
