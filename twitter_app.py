@@ -18,6 +18,9 @@ TRENDS_PLACE_ENDPOINT = 'https://api.twitter.com/1.1/trends/place.json?'
 TRENDS_AVAILABLE_ENDPOINT = 'https://api.twitter.com/1.1/trends/available.json'
 
 
+# Too many requests constant
+TOO_MANY = requests.codes.too_many or 429
+
 # Test value
 TEST_WOEID = '44418'
 
@@ -32,8 +35,11 @@ TREND_UPDATE_TIME = 24
 # Time interval between task launch time in hours
 TASK_INTERVAL = 24
 
+# Time to wait if too_many error occured in minutes
+TOO_MANY_WAIT = 15
+
 # Sleep time in seconds
-SLEEP_TIME = 3600
+SLEEP_TIME = 900
 
 # Delay before first start in seconds
 START_DELAY = 5
@@ -184,9 +190,10 @@ class TwitterApp:
 	# Save available places to database.
 	# This function may raise TwitterDBException or Error
 	def handle_trends_place(self, places):
-		places_list = []
-		coordinates = {}
+		woeid_list = self.db.get_woeids()
+		places_list = []	
 		for pl in places:
+			if unicode(pl['woeid']) in woeid_list: continue
 			placetype = pl['placeType']['name']
 			if placetype == 'Country' : placetype = 'country'
 			elif placetype == 'Supername': placetype = 'worldwide'
@@ -200,9 +207,9 @@ class TwitterApp:
 						'placetype' : placetype, \
 						'longitude' : longitude, \
 						'latitude' : latitude})
-			coordinates[str(pl['woeid'])] = {'longitude':longitude, 'latitude':latitude}
 		self.db.add_places(places_list)
-		self.memdb.save_coordinates(coordinates)
+		logging.info('HANDLE_TRENDS_PLACE: Total: database:%s, request:%s, added:%s' \
+					% (len(woeid_list), len(places), len(places_list)))
 
 	# Function requests available places.
 	def run_available(self):
@@ -216,6 +223,7 @@ class TwitterApp:
 		except TwitterBadResponse as exc:
 			logging.error('RUN_AVAILABLE: message=(%s, %s)' \
 					%(exc.reason, exc.code))
+			if exc.code == TOO_MANY: status = TOO_MANY
 		except TwitterDBException as exc:
 			logging.error('RUN_AVAILABLE: message=(%s)' % exc.message)
 		else:
@@ -227,20 +235,22 @@ class TwitterApp:
 
 	# Handle the result of the trends/places request.
 	# This function may raise TwitterDBException or Error.
-	def handle_trends(self, trends_data):
+	def handle_trends(self, trends_data, longitude, latitude):
 		trends_dict = trends_data[0]
 		woeid = trends_dict['locations'][0]['woeid']
 		trends = trends_dict['trends']
 		self.db.add_trends(trends, woeid)
-		self.memdb.save_trends(trends[:TREND_NUM_PER_PLACE], woeid)
+		self.memdb.save_trends(sorted(trends, reverse=True)[:TREND_NUM_PER_PLACE], \
+					woeid, longitude, latitude)
 
 
 
 	# This function saves trends to database.
-	def get_and_save_trends(self, city, bearer_token):
-		self.handle_trends(self.get_trends_place(bearer_token, city['woeid']))
+	def get_and_save_trends(self, place, bearer_token):
+		trends = self.get_trends_place(bearer_token, place['woeid'])
+		self.handle_trends(trends, place['longitude'], place['latitude'])
 		logging.info('RUN_TRENDS: Trends for %s which woeid is %s ' 
-			'has been saved.' % (city['name'], city['woeid']))
+			'has been saved.' % (place['name'], place['woeid']))
 
 
 
@@ -248,14 +258,14 @@ class TwitterApp:
 	# update_time days ago and for every city in cities list
 	# using possible tokens requests trends. Then wait for some time.
 	def run_trends_algorithm(self, update_time):
-		countries, cities = self.db.get_places(update_time)
+		places = self.db.get_places(update_time)
 		flag = True
 		while flag:
 			for token in self.tokens:
-				if cities: 
-					self.get_and_save_trends(cities.pop(0), token)
+				if places: 
+					self.get_and_save_trends(places.pop(0), token)
 				else: break
-			if not cities: flag = False
+			if not places: flag = False
 			else: time.sleep(TREND_REQUEST_SLEEP_TIME)
 
 
@@ -271,6 +281,7 @@ class TwitterApp:
 		except TwitterBadResponse as exc:
 			logging.error('RUN_TRENDS: message=(%s, %s)' \
 					%(exc.reason, exc.code))
+			if exc.code == TOO_MANY: status = TOO_MANY
 		except TwitterDBException as exc:
 			logging.error('RUN_TRENDS: message=(%s)' % exc.message)
 		except TwitterMemException as exc:
@@ -289,6 +300,8 @@ class TwitterApp:
 		trends_status = self.run_trends(TREND_UPDATE_TIME)
 		if not available_status and not trends_status:
 			raise Exception('Unexpected exception occured!')
+		return available_status, trends_status
+		
 
 
 	# Schedule
@@ -296,8 +309,11 @@ class TwitterApp:
 		start_time = datetime.now()
 		while True:
 			if datetime.now() >= start_time:
-				self.run_tasks()
-				start_time = datetime.now() + timedelta(hours=TASK_INTERVAL)
+				available_status, trends_status = self.run_tasks()
+				if TOO_MANY in (available_status, trends_status):
+					start_time = datetime.now() + timedelta(minutes=TOO_MANY_WAIT)
+				else:
+					start_time = datetime.now() + timedelta(hours=TASK_INTERVAL)
 				logging.info('Tasks were executed. Next start at %s' \
 						% start_time.strftime(DATETIME_FORMAT))
 			time.sleep(SLEEP_TIME)

@@ -18,30 +18,21 @@ class TwitterMem:
 
 
 	# Saves to memory list of trends with key woeid.
-	def save_trends(self, trends, woeid):
+	def save_trends(self, trends, woeid, longitude, latitude):
 		trend_list = []
 		for element in trends:
 			trend_list.append(element['name'])
 		data = self.redis.get(self.prefix)
 		if data:
 			data = json.loads(data)
-			data[str(woeid)]['trends'] = trend_list
+			if data.get(str(woeid)):
+				data[str(woeid)]['trends'] = trend_list
+			else:
+				data[str(woeid)] = {'trends' : trend_list, \
+						'coordinates': {'longitude':longitude, 'latitude':latitude}}
 		else:
 			data = {}
-			data[str(woeid)] = {'trends' : trend_list, 'coordinates':{}}
+			data[str(woeid)] = {'trends' : trend_list, \
+						'coordinates': {'longitude':longitude, 'latitude':latitude}}
 		self.redis.set(self.prefix, json.dumps(data))
-
-
-	def save_coordinates(self, coordinates):
-		data = self.redis.get(self.prefix)
-		if data:
-			data = json.loads(data)
-			for woeid, coord in coordinates.iteritems():
-				data[str(woeid)]['coordinates'] = coord
-		else:
-			data = {}
-			for woeid, coord in coordinates.iteritems():
-				data[str(woeid)] = {'trends' : [], 'coordinates':coord}
-		self.redis.set(self.prefix, json.dumps(data))
-
 

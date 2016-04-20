@@ -46,25 +46,32 @@ class TwitterDB:
 		except mysql.Error as error:
 			raise TwitterDBException(error=error)
 
-	def get_places(self, update_time=0):
+	def get_woeids(self):
 		try:
 			if not self.db.open: self.connect()
 			with closing(self.db.cursor(mysql.cursors.DictCursor)) as cursor:
-				cursor.execute("select name, woeid, dtime from place " \
-						"where placetype_id = (select id from placetype " \
-						"where name = 'town') " \
-						"and timestampdiff(HOUR, place.dtime, now()) >= %s;", (update_time,))
-				cities = list(cursor)
-				cursor.execute("select name, woeid, dtime from place " \
-						"where placetype_id = (select id from placetype " \
-						"where name = 'country') " \
-						"and timestampdiff(HOUR, place.dtime, now()) >= %s;", (update_time,))
-				countries = list(cursor)
+				cursor.execute("select woeid from place")
+				woeids = list(cursor)
 				self.db.commit
 			self.db.close()
 		except mysql.Error as error:
 			raise TwitterDBException(error=error)
-		return countries, cities
+		return [element['woeid'] for element in woeids]
+
+
+
+	def get_places(self, update_time=0):
+		try:
+			if not self.db.open: self.connect()
+			with closing(self.db.cursor(mysql.cursors.DictCursor)) as cursor:
+				cursor.execute("select name, woeid, dtime, longitude, latitude from place " \
+						"where timestampdiff(HOUR, place.dtime, now()) >= %s;", (update_time,))
+				places = list(cursor)
+				self.db.commit
+			self.db.close()
+		except mysql.Error as error:
+			raise TwitterDBException(error=error)
+		return places
 
 
 	def add_trends(self, trends, woeid):

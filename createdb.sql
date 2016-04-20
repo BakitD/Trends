@@ -1,6 +1,6 @@
 create database if not exists geomap;
 
-use geomap
+use geomap;
 
 
 create table if not exists placetype (
@@ -20,7 +20,6 @@ create table if not exists place (
 	placetype_id int not null,
 	foreign key(placetype_id) references placetype(id)
 		on delete cascade,
-	unique(name),
 	unique(woeid)
 );
 
@@ -35,6 +34,7 @@ create table if not exists trend (
 	id int not null auto_increment primary key,
 	name varchar(255) not null,
 	volume varchar(32) default null,
+	dtime timestamp not null default CURRENT_TIMESTAMP,
 	place_id int  not null,
 	foreign key(place_id) references place(id)
 		on delete cascade
