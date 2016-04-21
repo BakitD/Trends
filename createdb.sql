@@ -41,7 +41,6 @@ create table if not exists trend (
 );
 
 
-
 insert ignore into placetype (name) values ( 'town');
 insert ignore into placetype (name) values ( 'country');
 insert ignore into placetype (name) values ( 'worldwide');
