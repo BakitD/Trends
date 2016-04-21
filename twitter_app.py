@@ -139,6 +139,7 @@ class TwitterApp:
 			self.tokens = tokens
 			logging.info('SET_TOKEN: Tokens have been successfully obtained!')
 
+
 	# Defines the token choice algorithm.
 	def token_choice(self):
 		return self.tokens[0]
@@ -167,6 +168,7 @@ class TwitterApp:
 		headers = {
 			'User-Agent' : 'My Twitter App v1.0.23',
 			'Authorization' : 'Bearer %s' % bearer_token,
+			'Content-Type' : 'application/x-www-form-urlencoded;charset=UTF-8',
 			'Accept-Encoding' : 'gzip',
 		}
 		url = ''.join([TRENDS_PLACE_ENDPOINT, 'id=%s' % woeid])
