@@ -233,6 +233,13 @@ class TwitterApp:
 			status = True
 		return status
 
+	# Prepare trends
+	def prepare_trends(self, trends):
+		def sort_method(value):
+			try: result = int(value.get('tweet_volume'))
+			except: result = 0
+			return result
+		return sorted(trends, key=sort_method, reverse=True)[:TREND_NUM_PER_PLACE]
 
 
 	# Handle the result of the trends/places request.
@@ -242,8 +249,7 @@ class TwitterApp:
 		woeid = trends_dict['locations'][0]['woeid']
 		trends = trends_dict['trends']
 		self.db.add_trends(trends, woeid)
-		self.memdb.save_trends(sorted(trends, reverse=True)[:TREND_NUM_PER_PLACE], \
-					woeid, longitude, latitude)
+		self.memdb.save_trends(self.prepare_trends(trends), woeid, longitude, latitude)
 
 
 
