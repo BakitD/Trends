@@ -1,7 +1,7 @@
 import MySQLdb as mysql
 import base64
 from contextlib import closing
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from settings import DATETIME_FORMAT
 
@@ -30,16 +30,16 @@ class TwitterDB:
 			raise TwitterDBException(error=error)
 
 
-	def add_places(self, places):
+	def add_places(self, places, dtime):
 		try:
 			if not self.db.open: self.connect()
 			with closing(self.db.cursor()) as cursor:
 				for place in places:
 					insert = "insert ignore into place " \
-					"(name, woeid, parent_id, longitude, latitude, placetype_id) values " \
-					"(%s, %s, %s, %s, %s, (select id from placetype where name = %s));"
+					"(name, woeid, parent_id, dtime, longitude, latitude, placetype_id) values " \
+					"(%s, %s, %s, %s, %s, %s, (select id from placetype where name = %s));"
 					cursor.execute(insert, (place.get('name'), place.get('woeid'), 
-							place.get('parent_id'), place.get('longitude'), 
+							place.get('parent_id'), dtime, place.get('longitude'), 
 							place.get('latitude'), place.get('placetype')))
 				self.db.commit()
 			self.db.close()
@@ -79,9 +79,12 @@ class TwitterDB:
 			if not self.db.open: self.connect()
 			with closing(self.db.cursor()) as cursor:
 				for trend in trends:
-					insert = "insert into trend (name, volume, place_id) " \
-						 "values (%s, %s, (select id from place where woeid = %s));"
-					cursor.execute(insert, (trend['name'], trend['tweet_volume'], woeid))
+					insert = "insert ignore into trend (name) values (%s) " \
+						"on duplicate key update id = LAST_INSERT_ID(id);"
+					cursor.execute(insert, (trend['name'],))
+					insert = "insert into geotrend (volume, trend_id, place_id) " \
+						"values (%s, %s, (select id from place where woeid = %s));"
+					cursor.execute(insert, (trend['tweet_volume'], cursor.lastrowid, woeid,))
 				insert  = "update {} set dtime = %s where woeid = %s;".format('place')
 				cursor.execute(insert, (datetime.now().strftime(DATETIME_FORMAT), woeid))
 				self.db.commit()

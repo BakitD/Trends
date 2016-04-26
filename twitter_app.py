@@ -12,6 +12,7 @@ from twitter_mem import TwitterMemException
 from settings import TREND_NUM_PER_PLACE, DATETIME_FORMAT, YAHOO_APP_ID
 
 
+
 # Twitter endpoints
 BEARER_TOKEN_ENDPOINT = 'https://api.twitter.com/oauth2/token'
 TRENDS_PLACE_ENDPOINT = 'https://api.twitter.com/1.1/trends/place.json?'
@@ -209,7 +210,8 @@ class TwitterApp:
 						'placetype' : placetype, \
 						'longitude' : longitude, \
 						'latitude' : latitude})
-		self.db.add_places(places_list)
+		dtime = (datetime.now() - timedelta(days=1)).strftime(DATETIME_FORMAT)
+		self.db.add_places(places_list,dtime)
 		logging.info('HANDLE_TRENDS_PLACE: Total: database:%s, request:%s, added:%s' \
 					% (len(woeid_list), len(places), len(places_list)))
 
