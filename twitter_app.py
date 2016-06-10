@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from requests import RequestException
 from twitter_db import TwitterDBException
 from twitter_mem import TwitterMemException
-from settings import TREND_NUM_PER_PLACE, DATETIME_FORMAT, YAHOO_APP_ID
+from settings import TREND_NUM_PER_PLACE, DATETIME_FORMAT, YAHOO_APP_ID#, GOOGLE_APP_ID
 
 
 
@@ -189,6 +189,23 @@ class TwitterApp:
 		latitude = result['place']['centroid']['latitude']
 		return longitude, latitude
 
+	# Translate places names
+	'''
+	def translate_place_name(self, places):
+		for place in places:
+			url = 'https://www.googleapis.com/language/translate/v2/detect?key=' + GOOGLE_APP_ID \
+				+ '&q=' + place['name']
+			print url
+			import sys
+			sys.exit()
+			response = requests.get(url)
+			if response.status_code != requests.codes.ok:
+				raise TwitterBadResponse(reason=response.reason, code=response.status_code)
+			result = response.json()
+			print result
+		import sys
+		sys.exit()
+	'''
 
 	# Save available places to database.
 	# This function may raise TwitterDBException or Error
