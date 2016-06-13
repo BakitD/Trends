@@ -19,8 +19,8 @@ create table if not exists layer (
 
 create table if not exists place (
 	id int not null auto_increment primary key,
-	name varchar(32) not null,
-	another_name varchar(16) default null,
+	name varchar(64) not null,
+	another_name varchar(64) default null,
 	woeid varchar(16) not null,
 	longitude varchar(32) not null,
 	latitude varchar(32) not null,
